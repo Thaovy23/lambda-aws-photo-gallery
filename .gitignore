@@ -1,0 +1,12 @@
+target/
+.settings/
+.mvn/
+.classpath
+.project
+dependency-reduced-pom.xml
+*.log
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz

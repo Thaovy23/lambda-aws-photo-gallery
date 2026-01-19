@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Bucket List</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            table, th, td {
+                border: 1px solid;
+            }
+            #download_image {
+                max-width: 100%;
+                height: auto;
+                display: block;
+                margin-top: 20px;
+            }
+        </style>
+    </head>
+    <body>
+        <div>
+            <label for="file_input">file: </label>
+            <input type="file" id="file_input">
+            <button id="upload_button" onclick="uploadObject()">Upload</button>
+        </div>
+        <div><h1>Bucket List</h1></div>
+        <div>
+            <table id="objectsTable">
+            </table>
+        </div>
+        <div>
+            <img src="" id="download_image">
+        </div>
+        <script>
+            fetchListOfObjects();
+
+            const UPLOAD_URL = "https://vzp2tq2gm57k4dnwma2x5gvpcq0guerf.lambda-url.ap-southeast-1.on.aws/";
+            const LIST_URL = "https://zt2wg7wckp56ypv5uxrtgzuwlq0rfnxx.lambda-url.ap-southeast-1.on.aws/";
+            const GET_URL = "https://xq3vdmlb2sk3mubpdz3oac3q3y0bfacq.lambda-url.ap-southeast-1.on.aws/";
+            const DELETE_URL = "https://qkciyogs6e2y3gltp2p6za3cgu0pbjgi.lambda-url.ap-southeast-1.on.aws/";
+
+            function putObject(json) {
+                fetch(UPLOAD_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(json),
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then((resp) => {
+                    return resp.text().then(text => {
+                        console.log('Upload response:', text);
+                        return {status: resp.status, text: text, ok: resp.ok};
+                    });
+                })
+                .then((data) => {
+                    setTimeout(() => {
+                        fetchListOfObjects();
+                    }, 2000);
+                    return data;
+                })
+                .then((data) => {
+                    if (data.ok) {
+                        console.log('Upload successful');
+                    } else {
+                        console.log('Upload completed with status:', data.status);
+                    }
+                })
+                .catch((error) => {
+                    console.log('Upload request completed (may have network issues)');
+                    setTimeout(() => {
+                        fetchListOfObjects();
+                    }, 2000);
+                });
+            }
+
+            function uploadObject() {
+                const fileInput = document.getElementById("file_input");
+                const file = fileInput.files[0];
+
+                if (!file) {
+                    alert('Please choose a file first.');
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const uint8Array = new Uint8Array(reader.result);
+                    const body = {
+                        "content": uint8Array.toBase64(),
+                        "key": file.name
+                    };
+                    putObject(body);
+                };
+                reader.onerror = (e) => {
+                    console.log('Error : ' + e.type);
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            function renderListOfObjects(listOfObjects) {
+                let objectsTable = document.getElementById("objectsTable");
+                while (objectsTable.firstChild) {
+                    objectsTable.removeChild(objectsTable.lastChild);
+                }
+                let objectsArray = JSON.parse(listOfObjects);
+
+                for (let i = 0; i < objectsArray.length; i = i + 1) {
+                    let row = document.createElement("tr");
+                    
+                    let resizedImageCell = document.createElement("td");
+                    let resizedImg = document.createElement("img");
+                    resizedImg.src = "";
+                    resizedImg.style.maxWidth = "100px";
+                    resizedImg.style.maxHeight = "100px";
+                    resizedImg.alt = "Resized image";
+                    resizedImageCell.appendChild(resizedImg);
+                    fetchResizedObject(objectsArray[i].key, resizedImg);
+                    
+                    let keyCell = document.createElement("td");
+                    keyCell.innerHTML = objectsArray[i].key;
+                    
+                    let downloadCell = document.createElement("td");
+                    let downloadButton = document.createElement("button");
+                    downloadButton.addEventListener("click", function () {
+                        fetchObject(objectsArray[i].key)
+                    });
+                    downloadButton.innerHTML = "Download";
+                    downloadCell.appendChild(downloadButton);
+                    
+                    let deleteCell = document.createElement("td");
+                    let deleteButton = document.createElement("button");
+                    deleteButton.addEventListener("click", function () {
+                        deleteObject(objectsArray[i].key);
+                    });
+                    deleteButton.innerHTML = "Delete";
+                    deleteCell.appendChild(deleteButton);
+                    
+                    row.appendChild(resizedImageCell);
+                    row.appendChild(keyCell);
+                    row.appendChild(downloadCell);
+                    row.appendChild(deleteCell);
+                    objectsTable.appendChild(row);
+                }
+            }
+
+            function fetchListOfObjects() {
+                fetch(LIST_URL)
+                    .then((response) => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error, status = ${response.status}`);
+                        }
+                        return response.text();
+                    })
+                    .then((text) => {
+                        renderListOfObjects(text);
+                    })
+                    .catch((error) => {
+                        console.log(`Error: ${error.message}`);
+                    });
+            }
+
+            function fetchObject(key) {
+                const body = {
+                    "key": key
+                };
+                fetch(GET_URL, {
+                    method: 'PUT',
+                    body: JSON.stringify(body)
+                })
+                    .then(response => {
+                        const contentType = response.headers.get('Content-Type') || 'image/jpeg';
+                        return response.blob().then(blob => ({blob, contentType}));
+                    })
+                    .then(({blob, contentType}) => {
+                        const objectURL = URL.createObjectURL(blob);
+                        const img_S3 = document.getElementById("download_image");
+                        console.log('Setting image src:', objectURL, 'type:', contentType, 'size:', blob.size);
+                        img_S3.src = objectURL;
+                    })
+                    .catch(error => {
+                        console.error('Error processing image:', error);
+                    });
+            }
+
+            function fetchResizedObject(key, imgElement, retryCount = 0) {
+                const resizedKey = "resized-" + key;
+                const body = {
+                    "key": resizedKey,
+                    "bucket": "resizebucket-vy"
+                };
+                fetch(GET_URL, {
+                    method: 'PUT',
+                    body: JSON.stringify(body)
+                })
+                    .then(response => {
+                        if (response.ok) {
+                            const contentType = response.headers.get('Content-Type') || 'image/jpeg';
+                            return response.blob().then(blob => ({blob, contentType}));
+                        } else {
+                            throw new Error('Resized image not found');
+                        }
+                    })
+                    .then(({blob, contentType}) => {
+                        const objectURL = URL.createObjectURL(blob);
+                        imgElement.src = objectURL;
+                    })
+                    .catch(error => {
+                        if (retryCount < 5) {
+                            setTimeout(() => {
+                                fetchResizedObject(key, imgElement, retryCount + 1);
+                            }, 1000);
+                        } else {
+                            console.log('Resized image not found for: ' + key + ' after retries');
+                        }
+                    });
+            }
+
+            function deleteObject(key) {
+                const body = {
+                    "key": key
+                };
+
+                fetch(DELETE_URL, {
+                    method: 'DELETE', 
+                    body: JSON.stringify(body),
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => {
+                    console.log('Delete response status:', response.status);
+                    return response.text().then(text => {
+                        console.log('Delete response body:', text);
+                        return {status: response.status, text: text, ok: response.ok};
+                    });
+                })
+                .then(data => {
+                    console.log('Delete request completed');
+                    fetchListOfObjects();
+                })
+                .catch(error => {
+                    console.log('Delete request completed (may have network issues)');
+                    fetchListOfObjects();
+                });
+            }
+        </script>
+    </body>
+</html>
+

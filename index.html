@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Bucket List</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+        <style>
+            table, th, td {
+                border: 1px solid; 
+            }
+            .resized-img {
+                max-width: 100px; 
+                max-height: 100px;
+            }
+            #download_image {
+                max-width: 500px;
+                margin-top: 20px;
+            }
+            #objectsTable {
+                display: none;
+            }
+        </style>
+    </head>
+    <body>
+        <div>
+            <label>Email:</label> 
+            <input type="email" id="email_input"> 
+            <button onclick="login()">Generate Token</button> 
+        </div>
+        <div>
+            <label>Token:</label>
+            <input type="text" id="token_input">
+            <button onclick="verifyToken()">Login</button>
+        </div>
+        <div>
+            <button onclick="viewBucket()">View My Bucket</button>
+        </div>
+
+        <div>
+            <label for="file_input">file: </label>
+            <input type="file" id="file_input" accept="image/jpeg,image/jpg,image/png">
+            <label for="description_input" style="margin-left: 12px;">Description: </label>
+            <input type="text" id="description_input" style="width: 260px;">
+            <button id="upload_button" onclick="uploadObject()">Upload</button> 
+        </div>
+
+        <div><h1>Bucket List</h1></div>
+
+        <div>
+            <table id="objectsTable"> 
+            </table>
+        </div>
+
+        <div>
+            <img src="" id="download_image">
+        </div>
+
+        <script>
+            // API URLs
+            const GENERATE_TOKEN_URL = "https://hykkah47yqbclj4mq3adkxhwsq0kuwab.lambda-url.ap-southeast-1.on.aws/";
+            const VERIFY_TOKEN_URL = "https://hba5mfk4lvsi3o767htniddu640hxxeh.lambda-url.ap-southeast-1.on.aws/";
+            const GET_PHOTOS_DB_URL = "https://wxweknn6vztuo5672z3ls6zww40dyfez.lambda-url.ap-southeast-1.on.aws/";
+            const UPLOAD_WITH_DESCRIPTION_URL = "https://676v3onpfx243zljd4fvst6ry40jpxhu.lambda-url.ap-southeast-1.on.aws/";
+            const GET_OBJECT_URL = "https://xq3vdmlb2sk3mubpdz3oac3q3y0bfacq.lambda-url.ap-southeast-1.on.aws/";
+            const DELETE_OBJECT_URL = "https://qkciyogs6e2y3gltp2p6za3cgu0pbjgi.lambda-url.ap-southeast-1.on.aws/";
+            const DELETE_PHOTO_URL = "https://enhbrcosspq4e5mwjim2vre32u0ljyij.lambda-url.ap-southeast-1.on.aws/";
+
+            // ========== LOGIN FUNCTION ==========
+            async function login() {
+                const email = document.getElementById("email_input").value.trim(); // get email from input
+                
+                if (!email) {
+                    alert("Please enter your email");
+                    return;
+                }
+
+                try {
+                    const response = await fetch(GENERATE_TOKEN_URL, { // fetch token from API URL 
+                        method: 'POST', // POST request to generate token
+                        headers: { 'Content-Type': 'application/json' }, // set content type to JSON
+                        body: JSON.stringify({ email: email }) // send email to API
+                    });
+
+                    const data = await response.json(); // parse response to JSON
+
+                    if (response.ok && data.token) { // check if response is OK and token is present and valid token generated successfully
+                        const tokenMessage = `Email: ${data.email}\nToken: ${data.token}`; // create token message with email and token
+                        alert(tokenMessage); // alert token message to user
+                        document.getElementById("token_input").value = data.token; // set token to input
+                    } else {
+                        alert("Failed to generate token: " + (data.error || "Unknown error")); // alert error if token generation failed
+                    }
+                } catch (error) {
+                    alert("Error generating token: " + error.message); // alert error if token generation failed
+                }
+            }
+
+            // ========== VERIFY TOKEN FUNCTION ==========
+            async function verifyToken() {
+                const email = document.getElementById("email_input").value.trim(); 
+                const token = document.getElementById("token_input").value.trim();
+                
+                if (!email) {
+                    alert("Please enter your email first");
+                    return;
+                }
+
+                if (!token) {
+                    alert("Please enter a token to verify");
+                    return;
+                }
+
+                try {
+                    const response = await fetch(VERIFY_TOKEN_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            email: email,
+                            token: token
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        if (data.valid === true) {
+                            alert("Token is valid");
+                        } else {
+                            alert(` Token is INVALID!\n\nEmail: ${data.email}\nStatus: ${data.message || 'Token is invalid'}\n\nPlease generate a new token by clicking Login.`);
+                        }
+                    } else {
+                        alert("Failed to verify token: " + (data.error || "Unknown error"));
+                    }
+                } catch (error) {
+                    alert("Error verifying token: " + error.message);
+                }
+            }
+
+            // ========== VIEW BUCKET FUNCTION ==========
+            async function viewBucket() { // view bucket function to view all photos in the bucket
+                try {
+                    const response = await fetch(GET_PHOTOS_DB_URL, { // fetch photos from API URL by GET request 
+                        method: 'GET' // GET request to fetch photos 
+                    });
+
+                    if (!response.ok) { 
+                        throw new Error(`HTTP error, status = ${response.status}`); // throw error if response is not OK
+                    }
+
+                    const rawData = await response.text(); // parse response to text to get photos data 
+                    let photosData; // initialize photos data 
+
+                    try { // try to parse raw data to JSON to get photos data 
+                        const jsonData = JSON.parse(rawData); // parse raw data to JSON to get photos data 
+                        if (jsonData.body && jsonData.statusCode) { // check if body and status code are present in JSON data 
+                            photosData = jsonData.isBase64Encoded ? // check if body is base64 encoded 
+                                atob(jsonData.body) : jsonData.body; // decode base64 encoded body to get photos data 
+                        } else if (Array.isArray(jsonData)) { // check if JSON data is an array 
+                            photosData = JSON.stringify(jsonData); // convert JSON data to string to get photos data 
+                        } else {
+                            photosData = rawData; // set photos data to raw data if not array or body and status code are not present 
+                        }
+                    } catch (e) {
+                        try { // try to decode base64 encoded raw data to get photos data 
+                            photosData = atob(rawData); // decode base64 encoded raw data to get photos data 
+                            JSON.parse(photosData); // parse photos data to JSON to get photos data 
+                        } catch (e2) { // catch error if not base64 encoded or not array or body and status code are not present 
+                            photosData = rawData; // set photos data to raw data if not base64 encoded or not array or body and status code are not present 
+                        }
+                    }
+
+                    renderListOfObjects(photosData);            
+                    document.getElementById("objectsTable").style.display = "table";
+
+                } catch (error) {
+                    alert("Failed to load photos: " + error.message);
+                }
+            }
+
+            // ========== HELPER: Get Auth Headers ==========
+            function getAuthHeaders() {
+                const email = document.getElementById("email_input").value.trim();
+                const token = document.getElementById("token_input").value.trim();
+                return {
+                    'Content-Type': 'application/json',
+                    'X-User-Email': email,
+                    'X-User-Token': token
+                };
+            }
+
+            // ========== RENDER TABLE ==========
+            function renderListOfObjects(listOfObjects) {
+                let objectsTable = document.getElementById("objectsTable");
+                while (objectsTable.firstChild) {
+                    objectsTable.removeChild(objectsTable.lastChild);
+                }
+                let photosArray = JSON.parse(listOfObjects);
+
+                // Header row
+                let headerRow = document.createElement("tr");
+                ["No.", "Thumbnail", "Description", "Email", "Download", "Delete"].forEach(text => {
+                    let th = document.createElement("th");
+                    th.innerHTML = text;
+                    headerRow.appendChild(th);
+                });
+                objectsTable.appendChild(headerRow);
+
+                if (!Array.isArray(photosArray) || photosArray.length === 0) {
+                    let row = document.createElement("tr");
+                    let cell = document.createElement("td");
+                    cell.colSpan = 6;
+                    cell.innerHTML = "No photos found. Upload some photos to get started!";
+                    cell.style.textAlign = "center";
+                    cell.style.padding = "20px";
+                    row.appendChild(cell);
+                    objectsTable.appendChild(row);
+                    return;
+                }
+
+                for (let i = 0; i < photosArray.length; i = i + 1) {
+                    let row = document.createElement("tr");
+                    
+                    // Number Cell
+                    let numberCell = document.createElement("td");
+                    numberCell.innerHTML = i + 1;
+
+                    // Thumbnail Cell
+                    let imgCell = document.createElement("td");
+                    let img = document.createElement("img");
+                    img.className = "resized-img";
+                    img.alt = "Loading...";
+                    const resizedKey = "resized-" + photosArray[i].S3Key;
+                    fetchResizedImage(resizedKey, img);
+                    imgCell.appendChild(img);
+
+                    // Description Cell
+                    let descCell = document.createElement("td");
+                    descCell.innerHTML = photosArray[i].Description;
+                    
+                    // Email Cell
+                    let emailCell = document.createElement("td");
+                    emailCell.innerHTML = photosArray[i].email || "N/A";
+                    
+                    // Download Button Cell
+                    let downloadCell = document.createElement("td");
+                    let downloadButton = document.createElement("button");
+                    downloadButton.addEventListener("click", function () {
+                        fetchObject(photosArray[i].S3Key);
+                    });
+                    downloadButton.innerHTML = "Download";
+                    downloadCell.appendChild(downloadButton);
+                    
+                    // Delete Button Cell
+                    let deleteCell = document.createElement("td");
+                    let deleteButton = document.createElement("button");
+                    deleteButton.addEventListener("click", function () {
+                        deleteObject(photosArray[i].S3Key);
+                    });
+                    deleteButton.innerHTML = "Delete";
+                    deleteCell.appendChild(deleteButton);
+                    
+                    // Append all cells to row
+                    row.appendChild(numberCell);
+                    row.appendChild(imgCell);
+                    row.appendChild(descCell);
+                    row.appendChild(emailCell);
+                    row.appendChild(downloadCell);
+                    row.appendChild(deleteCell);
+                    objectsTable.appendChild(row);
+                }
+            }
+
+            // ========== FETCH PHOTOS FROM DB ==========
+            function fetchPhotosFromDB() {
+                const downloadImg = document.getElementById("download_image");
+                if (downloadImg && downloadImg.src && downloadImg.src.startsWith("blob:")) {
+                    URL.revokeObjectURL(downloadImg.src);
+                }
+                if (downloadImg) {
+                    downloadImg.src = "";
+                }
+
+                let url = GET_PHOTOS_DB_URL;
+                fetch(url, {
+                    method: 'GET'
+                })
+                .then((response) => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error, status = ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then((rawData) => {
+                    let photosData;
+                    try {
+                        const jsonData = JSON.parse(rawData);
+                        if (jsonData.body && jsonData.statusCode) {
+                            photosData = jsonData.isBase64Encoded ? 
+                                atob(jsonData.body) : jsonData.body;
+                        } else if (Array.isArray(jsonData)) {
+                            photosData = JSON.stringify(jsonData);
+                        } else {
+                            photosData = rawData;
+                        }
+                    } catch (e) {
+                        try {
+                            photosData = atob(rawData);
+                            JSON.parse(photosData);
+                        } catch (e2) {
+                            photosData = rawData;
+                        }
+                    }
+                    renderListOfObjects(photosData);
+                    document.getElementById("objectsTable").style.display = "table";
+                })
+                .catch((error) => {
+                    console.log(`Error: ${error.message}`);
+                    alert('Failed to load photos: ' + error.message);
+                });
+            }
+
+            // ========== FETCH RESIZED IMAGE ==========
+            function fetchResizedImage(key, imgElement) {
+                function getMimeType(filename) {
+                    const ext = filename.split('.').pop().toLowerCase();
+                    switch (ext) {
+                        case 'jpg':
+                        case 'jpeg':
+                            return 'image/jpeg';
+                        case 'png':
+                            return 'image/png';
+                        case 'gif':
+                            return 'image/gif';
+                        default:
+                            return 'image/jpeg';
+                    }
+                }
+
+                const email = document.getElementById("email_input").value.trim();
+                const token = document.getElementById("token_input").value.trim();
+                if (!email || !token) {
+                    imgElement.alt = "Login to view image";
+                    return;
+                }
+
+                const url = `${GET_OBJECT_URL}?key=${encodeURIComponent(key)}&bucket=${encodeURIComponent("resizebucket-vy")}`;
+                
+                fetch(url, {
+                    method: 'GET',
+                    headers: getAuthHeaders()
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then((jsonData) => {
+                    if (!jsonData.data || jsonData.data.length === 0) {
+                        throw new Error('Empty response from Lambda');
+                    }
+                    try {
+                        const binaryString = atob(jsonData.data);
+                        const bytes = new Uint8Array(binaryString.length);
+                        for (let i = 0; i < binaryString.length; i++) {
+                            bytes[i] = binaryString.charCodeAt(i);
+                        }
+                        const mimeType = jsonData.contentType || getMimeType(key);
+                        const blob = new Blob([bytes], { type: mimeType });
+                        const objectURL = URL.createObjectURL(blob);
+                        imgElement.src = objectURL;
+                        imgElement.onerror = function() {
+                            this.alt = "Error loading image";
+                            URL.revokeObjectURL(objectURL);
+                        };
+                    } catch (error) {
+                        imgElement.alt = "Error loading image";
+                    }
+                })
+                .catch(error => {
+                    imgElement.alt = "Error loading image";
+                });
+            }
+
+            // ========== FETCH OBJECT (DOWNLOAD) ==========
+            function fetchObject(key) {
+                const email = document.getElementById("email_input").value.trim();
+                const token = document.getElementById("token_input").value.trim();
+                if (!email || !token) {
+                    alert("Please login and enter token first");
+                    return;
+                }
+
+                const url = `${GET_OBJECT_URL}?key=${encodeURIComponent(key)}`;
+                fetch(url, {
+                    method: 'GET',
+                    headers: getAuthHeaders()
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then((jsonData) => {
+                    if (!jsonData.data || jsonData.data.length === 0) {
+                        throw new Error('Empty response from Lambda');
+                    }
+                    const binaryString = atob(jsonData.data);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    const mimeType = jsonData.contentType || 'application/octet-stream';
+                    const blob = new Blob([bytes], { type: mimeType });
+                    const objectURL = URL.createObjectURL(blob);
+                    const img_S3 = document.getElementById("download_image");
+                    img_S3.src = objectURL;
+                })
+                .catch(error => {
+                    console.log('Error downloading object:', error);
+                    alert('Failed to download: ' + error.message);
+                });
+            }
+
+            // ========== DELETE OBJECT ==========
+            function deleteObject(key) {
+                if (!confirm('Are you sure you want to delete "' + key + '"?')) {
+                    return;
+                }
+
+                const email = document.getElementById("email_input").value.trim();
+                const token = document.getElementById("token_input").value.trim();
+
+                if (!email || !token) {
+                    alert("Please login and enter token first");
+                    return;
+                }
+
+                const url = DELETE_PHOTO_URL + '?key=' + encodeURIComponent(key);
+
+                fetch(url, {
+                    method: 'DELETE',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ key: key })
+                })
+                .then(response => {
+                    if (response.status === 401) {
+                        alert("Invalid token! Please generate a new token.");
+                        return Promise.reject(new Error("Unauthorized"));
+                    }
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            throw new Error(`HTTP error, status = ${response.status}: ${text}`);
+                        });
+                    }
+                    return response.json().catch(() => response.text());
+                })
+                .then(data => {
+                    if (data && data.message) {
+                        alert('Delete successful: ' + data.message);
+                    } else {
+                        alert('Delete successful!');
+                    }
+                    fetchPhotosFromDB();
+                })
+                .catch(error => {
+                    alert('Failed to delete the object: ' + error.message); 
+                });
+            }
+
+            // ========== PUT OBJECT (UPLOAD) ==========
+            function putObject(json) {
+                const email = document.getElementById("email_input").value.trim();
+                const token = document.getElementById("token_input").value.trim();
+
+                if (!email || !token) {
+                    alert("Please login and enter token first");
+                    return;
+                }
+
+                let url = UPLOAD_WITH_DESCRIPTION_URL;
+                fetch(url, {
+                    method: 'POST',
+                    body: JSON.stringify(json),
+                    headers: getAuthHeaders()
+                })
+                .then((resp) => {
+                    if (resp.status === 401) {
+                        alert("Invalid token! Please generate a new token.");
+                        return Promise.reject(new Error("Unauthorized"));
+                    }
+                    return resp.json();
+                })
+                .then(function(response) {
+                    fetchPhotosFromDB();
+                    console.info('fetch()', response);
+                    alert('Upload successful!');
+                })
+                .catch(error => {
+                    console.error('Upload error:', error);
+                    alert('Upload failed: ' + error.message);
+                });
+            }
+
+            // ========== UPLOAD OBJECT ==========
+            function uploadObject() {
+                let file_input = document.getElementById("file_input");
+                let description_input = document.getElementById("description_input");
+                let file = file_input.files[0];
+                
+                if (!file) {
+                    alert('Please select a file to upload.');
+                    return;
+                }
+                
+                const description = description_input.value.trim();
+                if (!description) {
+                    alert('Please enter a description for the photo.');
+                    description_input.focus();
+                    return;
+                }
+                
+                let reader = new FileReader();
+                reader.onload = () => {
+                    const uint8Array = new Uint8Array(reader.result);
+                    let binaryString = '';
+                    for (let i = 0; i < uint8Array.length; i++) {
+                        binaryString += String.fromCharCode(uint8Array[i]);
+                    }
+                    const base64Content = btoa(binaryString);
+                    
+                    const body = {
+                        "content": base64Content,
+                        "key": file.name,
+                        "description": description
+                    };
+                    putObject(body);
+                    file_input.value = '';
+                    description_input.value = '';
+                };
+                reader.onerror = (e) => {
+                    console.log('Error : ' + e.type);
+                };
+                reader.readAsArrayBuffer(file);  
+            }
+        </script>
+    </body>
+</html>
