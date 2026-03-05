@@ -1,4 +1,4 @@
-## Serverless Photo Gallery on AWS (Lambda + Java)
+## Serverless Photo Gallery on AWS 
 
 A serverless photo gallery built on AWS that supports token-based login, secure photo uploads, automatic thumbnail generation, and a simple bucket-like web UI.
 
