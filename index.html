@@ -169,8 +169,8 @@
                         }
                     }
 
-                    renderListOfObjects(photosData);            
-                    document.getElementById("objectsTable").style.display = "table";
+                    renderListOfObjects(photosData);  // để hiển thị bảng         
+                    document.getElementById("objectsTable").style.display = "table"; 
 
                 } catch (error) {
                     alert("Failed to load photos: " + error.message);
@@ -178,7 +178,7 @@
             }
 
             // ========== HELPER: Get Auth Headers ==========
-            function getAuthHeaders() {
+            function getAuthHeaders() { 
                 const email = document.getElementById("email_input").value.trim();
                 const token = document.getElementById("token_input").value.trim();
                 return {
