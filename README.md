@@ -4,7 +4,6 @@ A serverless photo gallery built on AWS that supports token-based login, secure 
 
 It demonstrates an end-to-end architecture using **AWS Lambda (Java + AWS SDK v2)**, **Lambda Function URLs**, **S3**, **RDS MySQL**, **Systems Manager Parameter Store**, and **IAM least-privilege permissions**.
 
----
 
 ## What the app does
 
@@ -32,7 +31,6 @@ It demonstrates an end-to-end architecture using **AWS Lambda (Java + AWS SDK v2
   - S3 deletion (`LambdaDeleteObject`)
   - DB row deletion (`LambdaDeletePhotoDB`)
 
----
 
 ## Project goals
 
@@ -41,7 +39,6 @@ It demonstrates an end-to-end architecture using **AWS Lambda (Java + AWS SDK v2
 - Keep the system modular by separating responsibilities across Lambda functions (token, upload, resize, DB metadata, retrieval, deletion orchestration).
 - Address practical serverless concerns such as cold starts via an optional warm-up schedule (EventBridge/CloudWatch).
 
----
 
 ## Tech stack
 
@@ -58,7 +55,6 @@ It demonstrates an end-to-end architecture using **AWS Lambda (Java + AWS SDK v2
 - **Optional**
   - **LambdaTimer** (EventBridge/CloudWatch) to warm up functions and reduce cold starts
 
----
 
 ## Architecture overview
 
@@ -75,13 +71,6 @@ High-level flow:
 5. Thumbnails/originals load on-demand via `LambdaGetObject`.
 6. User can **Download** or **Delete** via `LambdaDeletePhoto`.
 
-![Architecture](assets/architecture-diagram.png)
-
-Optional sequence diagram (useful for interviews / debugging the flow):
-
-![Upload Sequence](assets/sequence-upload.png)
-
----
 
 ## Lambda functions
 
@@ -104,7 +93,6 @@ Optional sequence diagram (useful for interviews / debugging the flow):
 - `LambdaDeleteObject`: deletes object(s) from S3
 - `LambdaDeletePhotoDB`: deletes metadata row from RDS
 
----
 
 ## Configuration
 
@@ -121,7 +109,6 @@ Optional sequence diagram (useful for interviews / debugging the flow):
 ### Parameter Store
 - `keytokenhash`: secret used to generate/verify HMAC tokens
 
----
 
 ## Lambda & IAM permissions (security highlights)
 
@@ -159,8 +146,6 @@ Optional sequence diagram (useful for interviews / debugging the flow):
 Lambdas that access S3 directly (e.g., `LambdaUploadObject`, `LambdaGetObject`, `LambdaDeleteObject`) typically need:
 - `s3:PutObject`, `s3:GetObject`, `s3:DeleteObject`
 - scoped to the buckets used (`public-mg2`, `resizebucket-vy`)
-
----
 
 ## Notes
 - For browser calls to Lambda Function URLs, configure CORS appropriately.
