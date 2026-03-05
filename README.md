@@ -110,8 +110,7 @@ High-level flow:
 - `keytokenhash`: secret used to generate/verify HMAC tokens
 
 
-## Lambda & IAM permissions (security highlights)
-
+## Lambda & IAM permissions 
 ### LambdaUploadWithDescription
 **IAM role permissions**
 - `lambda:InvokeFunction` on:
@@ -121,7 +120,7 @@ High-level flow:
 - CloudWatch Logs:
   - `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents`
 
-**Environment variables (optional)**
+**Environment variables**
 - `UPLOAD_FUNCTION_NAME`: name of Lambda that uploads to S3
 - `INSERT_FUNCTION_NAME`: name of Lambda that inserts DB row
 - `RESIZE_FUNCTION_NAME`: name of Lambda that resizes the image
